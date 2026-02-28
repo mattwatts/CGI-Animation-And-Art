@@ -1,0 +1,356 @@
+"""
+UNE DEEP RESEARCH PROTOCOL v2.2 - SOVEREIGN CODE
+SCRIPT: logic_garden_v30.py
+MODE:   Nursery (Navy Palette)
+TARGET: CATOBAR Operations (Launch & Recovery)
+STYLE:  "The Gentle Violence" | High Contrast | 4K Ready
+
+AUTHOR: Matt Watts / Assistant Protocol
+"""
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon, Rectangle, Circle
+import os
+
+# --- 1. THE NAVY PALETTE ---
+BG_COLOR = "#001020"        # Night Ocean/Sky
+DECK_COLOR = "#303030"      # Non-skid Grey
+STRIPE_COLOR = "#FFFFFF"    # Foul Lines
+PLANE_COLOR = "#708090"     # Haze Grey (F-18ish)
+STEAM_COLOR = "#F0F8FF"     # Alice Blue / Steam
+WIRE_COLOR = "#FFD700"      # Gold (The Trap)
+BURNER_COLOR = "#FF4500"    # Orange (Full Power)
+
+# --- 2. CONFIGURATION ---
+FPS = 30
+DURATION = 20
+TOTAL_FRAMES = FPS * DURATION
+LAUNCH_END_FRAME = 300 # Split point
+
+class CarrierSim:
+    def __init__(self):
+        self.reset_launch()
+
+    def reset_launch(self):
+        # Phase 1: Launch
+        self.phase = "LAUNCH"
+        self.plane_x = -15
+        self.plane_y = 0
+        self.plane_vx = 0
+        self.plane_vy = 0
+        self.plane_angle = 0 # Pitch
+        self.throttle = 0.5
+        self.steam_particles = []
+        self.hook_down = False
+        self.wire_engaged = False
+        
+        # Physics
+        self.cat_start = -15
+        self.cat_end = 10
+        self.launch_accel = 0.8 # Violent
+
+    def reset_recovery(self):
+        # Phase 2: Trap
+        self.phase = "TRAP"
+        self.plane_x = 30 # Coming from right
+        self.plane_y = 5  # In air
+        self.plane_vx = -0.9 # Fast approach
+        self.plane_vy = -0.15 # Descent
+        self.plane_angle = 5 # AOA 5 deg nose up
+        self.throttle = 0.4
+        self.hook_down = True
+        self.wire_engaged = False
+        self.wire_pos = 0.0 # x coord of wire anchor (relative to deck center)
+        self.wire_stretch_x = 0.0
+        
+        # Wire location
+        self.wire_anchor_x = -5.0 # The '3 wire' target
+
+    def update(self, frame_idx):
+        if frame_idx == LAUNCH_END_FRAME:
+            self.reset_recovery()
+
+        # Update Particles (Steam or Smoke)
+        for p in self.steam_particles:
+            p['life'] -= 0.02
+            p['x'] += p['vx']
+            p['y'] += p['vy']
+            p['r'] += 0.01
+        self.steam_particles = [p for p in self.steam_particles if p['life'] > 0]
+
+        if self.phase == "LAUNCH":
+            # Logic
+            # 0-60: Wait/Tension
+            # 60+: Fire
+            
+            local_f = frame_idx
+            
+            if local_f > 60:
+                self.throttle = 1.0
+                if self.plane_x < self.cat_end:
+                    # On Cat
+                    self.plane_vx += self.launch_accel * 0.1 # Accumulate speed fast
+                    self.plane_x += self.plane_vx
+                    
+                    # Steam Gen
+                    if local_f % 2 == 0:
+                        self.steam_particles.append({
+                            'x': self.plane_x - 1, 'y': 0, 'vx': -0.1, 'vy': 0.1, 'r': 0.2, 'life': 1.0
+                        })
+                else:
+                    # Off Cat - Fly
+                    self.plane_vx = max(self.plane_vx, 0.8) # Maintain flyout speed
+                    self.plane_x += self.plane_vx
+                    self.plane_vy += 0.01 # Lift
+                    self.plane_y += self.plane_vy
+                    self.plane_angle = min(15, self.plane_angle + 0.5) # Pitch up
+            else:
+                # Tension (Squat)
+                self.plane_angle = -1 # Nose down slightly ("Squat")
+
+        elif self.phase == "TRAP":
+            # Approach Logic
+            
+            if not self.wire_engaged:
+                self.plane_x += self.plane_vx
+                self.plane_y += self.plane_vy
+                
+                # Check Contact
+                if self.plane_y <= 0:
+                    self.plane_y = 0
+                    self.plane_vy = 0
+                    self.throttle = 1.0 # BOLTER LOGIC: Max power on touch
+                    
+                    # Check Wire (Target X = -5 to -6)
+                    # Hook is at back of plane (approx plane_x + 2)
+                    hook_x = self.plane_x + 2.0
+                    
+                    if hook_x < self.wire_anchor_x + 1.0 and hook_x > self.wire_anchor_x - 1.0:
+                        self.wire_engaged = True
+                        self.wire_stretch_x = hook_x
+                        self.plane_angle = 0 # Slam nose down
+                    else:
+                        # BOLTER! (Missed wire)
+                        # For this demo, let's force a catch for visual satisfaction?
+                        # Or adjust start params to ensure catch.
+                        pass
+            
+            else:
+                # WIRE ENGAGED
+                # Decelerate violently
+                self.throttle = 1.0 # Engine fighting wire
+                
+                # Drag force
+                drag = 0.06
+                self.plane_vx += drag # vx is negative, so add positive to stop
+                
+                if self.plane_vx > 0: self.plane_vx = 0 # Stopped
+                
+                self.plane_x += self.plane_vx
+                self.wire_stretch_x = self.plane_x + 2.0 # Hook follows plane
+
+    def render(self, frame_idx, ax):
+        # Camera Pan
+        # Launch: Follow plane
+        if self.phase == "LAUNCH":
+            cam_x = max(0, self.plane_x + 5)
+            # Limit cam
+            if cam_x > 20: cam_x = 20
+        else:
+            # Trap: Fixed on wire area mostly
+            cam_x = 0
+            
+        ax.set_xlim(cam_x - 20, cam_x + 20)
+        ax.set_ylim(-5, 15)
+        
+        # 1. Deck
+        ax.add_patch(Rectangle((-100, -5), 200, 5, facecolor=DECK_COLOR))
+        # Foul Lines
+        ax.plot([-100, 100], [0, 0], color=STRIPE_COLOR, linestyle="--")
+        
+        # 2. Catapult (Launch Only)
+        if self.phase == "LAUNCH":
+            ax.plot([self.cat_start, self.cat_end], [0.1, 0.1], color="#555555", linewidth=3)
+            # Shuttle
+            if self.plane_x < self.cat_end:
+                 ax.add_patch(Rectangle((self.plane_x, 0), 0.5, 0.3, color="white"))
+
+        # 3. Wires (Recovery Only)
+        if self.phase == "TRAP":
+            # Draw wires on deck
+            # Target wire
+            wx = self.wire_anchor_x
+            
+            if self.wire_engaged:
+                # Draw V shape
+                # Anchors at z (into screen). Represented as points?
+                # Just draw line from hook to anchor point projected on X
+                # Visual abstraction: Line from Hook to fixed points on deck
+                # Anchor points at [wx+10, z] and [wx-10, z]? No, side of deck.
+                # Side view: We see the wire stretch horizontally.
+                
+                hook_pt = [self.wire_stretch_x, 0.5] # Hook height
+                deck_anchor = [wx, 0.1] # Original position impact
+                
+                # To show stress, draw line from anchor to hook
+                ax.plot([deck_anchor[0], hook_pt[0]], [0.1, 0.5], color=WIRE_COLOR, linewidth=2)
+                
+                # Spark?
+                if abs(self.plane_vx) > 0.1:
+                    ax.add_patch(Circle((hook_pt[0], 0), 0.3, color="#FFFF00", alpha=0.5))
+
+            else:
+                # Wire waiting
+                ax.plot([wx, wx], [0, 0.2], color=WIRE_COLOR, linewidth=2) # Slight raised profile
+
+        # 4. Steam Particles
+        for p in self.steam_particles:
+            ax.add_patch(Circle((p['x'], p['y']), p['r'], color=STEAM_COLOR, alpha=p['life']))
+
+        # 5. The Plane
+        # Coords relative to 0,0 center
+        # Nose Left (Negative X)
+        # Tail Right (Positive X)
+        
+        # If RECOVERY, Plane is flying Left.
+        # If LAUNCH, Plane is flying Right.
+        
+        # Generic shape
+        pts = [
+            [2.5, 0.5], # Nose
+            [0, 1.0],   # Cockpit
+            [-2, 1.0],  # Spine
+            [-3, 1.8],  # Tail Top
+            [-3.5, 0.5], # Tail Base
+            [-2.5, 0.2], # Nozzle
+            [-1, -0.2],  # Belly
+            [1, -0.2]    # Intake
+        ]
+        
+        # Flip for landing? 
+        # Launch: Nose leads positive X.
+        # Landing: Nose leads negative X (coming from right).
+        
+        final_pts = []
+        
+        scale_x = 1.0
+        if self.phase == "TRAP": scale_x = -1.0 # Flip X
+        
+        # Rotation
+        rad = np.radians(self.plane_angle)
+        # If flipped, rotation applies differently? 
+        # Just rotate first, then flip?
+        # Standard: Rotate points, then translate.
+        
+        c, s = np.cos(rad), np.sin(rad)
+        
+        for p in pts:
+            # Local adjust
+            px, py = p[0] * scale_x, p[1]
+            
+            # Rotate
+            rx = px*c - py*s
+            ry = px*s + py*c
+            
+            final_pts.append([self.plane_x + rx, self.plane_y + ry])
+            
+        ax.add_patch(Polygon(final_pts, facecolor=PLANE_COLOR, edgecolor="black", zorder=10))
+        
+        # The Hook
+        if self.hook_down:
+            # Hook pivot near tail
+            # Tail is at approx local x=-3 (if Launch) or x=3 (if Trap)
+            
+            # Find tail pivot
+            pivot_local = [-2.5 * scale_x, 0.2]
+            # Rotate pivot
+            px = pivot_local[0]*c - pivot_local[1]*s
+            py = pivot_local[0]*s + pivot_local[1]*c
+            pivot_idx = [self.plane_x + px, self.plane_y + py]
+            
+            # Hook End
+            # Down and back
+            hook_len = 1.6
+            ang_h = -50 if self.phase == "LAUNCH" else -45 # Angled down
+            
+            # If plane is pitched up, hook angle relative to plane
+            ha_rad = np.radians(ang_h if self.phase=="LAUNCH" else -60) # Steeper for trap
+            
+            # If Flipped (Trap)
+            # Hook points right (trailing)
+            
+            hx_local = np.cos(ha_rad) * hook_len * (-1 if self.phase=="TRAP" else 1) # Trails behind
+            hy_local = np.sin(ha_rad) * hook_len
+            
+            # Need to rotate hook vector by plane pitch
+            hx_rot = hx_local*c - hy_local*s
+            hy_rot = hx_local*s + hy_local*c
+            
+            hook_tip = [pivot_idx[0] + hx_rot, pivot_idx[1] + hy_rot]
+            
+            # Draw Stick
+            ax.plot([pivot_idx[0], hook_tip[0]], [pivot_idx[1], hook_tip[1]], color="black", linewidth=2)
+            # Draw Tip
+            ax.add_patch(Circle((hook_tip[0], hook_tip[1]), 0.1, color="yellow"))
+
+        # Afterburner
+        if self.throttle > 0.8:
+            # Location: Nozzle
+            nozs = [-2.5 * scale_x, 0.2]
+            nx = nozs[0]*c - nozs[1]*s + self.plane_x
+            ny = nozs[0]*s + nozs[1]*c + self.plane_y
+            
+            # Direction: Opposite to nose
+            # Nose is Scale_X. Exhaust is -Scale_X.
+            
+            fx = -scale_x * np.cos(rad)
+            fy = -scale_x * np.sin(rad)
+            
+            f_len = 3.0 * np.random.rand() + 2.0
+            
+            flame_pts = [
+                [nx + fy*0.2, ny - fx*0.2],
+                [nx + fx*f_len, ny + fy*f_len],
+                [nx - fy*0.2, ny + fx*0.2]
+            ]
+            ax.add_patch(Polygon(flame_pts, color=BURNER_COLOR, alpha=0.6))
+
+        # HUD
+        txt = "LAUNCH SEQUENCE" if self.phase == "LAUNCH" else "RECOVERY SEQUENCE"
+        spd = abs(self.plane_vx) * 200 # Fake knots
+        ax.text(cam_x - 18, 12, f"{txt}\nSPEED: {spd:.0f} KTS\nHOOK: {'DOWN' if self.hook_down else 'UP'}", 
+                fontfamily='monospace', color="#00FF00", fontsize=15)
+
+        ax.set_aspect('equal')
+        ax.set_axis_off()
+        
+        # Save
+        out_dir = "logic_garden_catobar_frames"
+        os.makedirs(out_dir, exist_ok=True)
+        filename = os.path.join(out_dir, f"cat_{frame_idx:04d}.png")
+        plt.savefig(filename, facecolor=BG_COLOR)
+        plt.close()
+
+# --- 3. EXECUTION ---
+if __name__ == "__main__":
+    print("[NURSERY] Tension on the Catapult...")
+    
+    sim = CarrierSim()
+    
+    for i in range(TOTAL_FRAMES):
+        fig = plt.figure(figsize=(16, 8), dpi=100)
+        ax = plt.Axes(fig, [0., 0., 1., 1.])
+        ax.set_axis_off()
+        fig.add_axes(ax)
+        ax.set_facecolor(BG_COLOR)
+        
+        sim.update(i)
+        sim.render(i, ax)
+        
+        plt.close()
+        
+        if i % 30 == 0:
+            print(f"Frame {i}/{TOTAL_FRAMES}")
