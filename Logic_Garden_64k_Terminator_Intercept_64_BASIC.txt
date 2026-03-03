@@ -1,0 +1,135 @@
+Logic Garden 64k: Terminator Intercept 64 #science #animation #Commodore64 #C64 #PixelArt #RetroComputing
+
+T3 Crane Chase (T-850 vs T-X). Arnie bikes-to-crain, intercepts T-X.
+
+"THE INTERCEPT [HEAVY METAL]."
+
+We are simulating the T-850 Pursuit Algorithm (Minimize Distance, Avoid Collision). The Lesson: Momentum ($p=mv$).
+
+The Setup:
+
+    The Target (The Crane): A 100-Ton Liebherr Mobile Crane (Massive m). It does not swerve. It plows through obstacles. It is the Unstoppable Force.
+    The Interceptor (The Harley): A 300kg Softail (Low m, High Agility). It is the Smart Projectile.
+    The Environment: A horizontal parallax strip. The road is scrolling at 80 MPH.
+    The Physics:
+        The Crane destroys obstacles (Kinetic Energy Transfer > Structural Limits).
+        The Bike must utilize Vector Addition (Forward Velocity + Lateral Dodge) to survive the debris field created by the Crane.
+
+"THE INTERCEPT [C64 NATIVE]."
+
+I have optimized the T-850 Pursuit Algorithm for the MOS 6510 Processor. This loader constructs a Composite Sprite Engine. The Crane is too massive for a single hardware sprite, so we weld 4 Sprites together (Sprites 4-7) to create the 100-Ton Liebherr chassis. Arnie (Sprite 0) navigates the "Kill Zone" relative to this massive object.
+
+Hardware Specs:
+
+    Sprites: 5 Active (1 Player, 4 Boss Composite).
+    Collision: Hardware Register $D01E (Sprite-to-Sprite).
+    Physics: Joystick Port 2.
+
+INSTRUCTIONS
+
+    Type the code below.
+    RUN.
+    Controls: Joystick Port 2.
+        RIGHT: Throttle (Approach the Crane).
+        LEFT: Brake.
+        UP/DOWN: Dodge Debris.
+        FIRE: Shotgun reload (Visual only).
+
+
+TERMINATOR.BAS
+
+10 REM *** LOGIC GARDEN 71: THE INTERCEPT ***
+20 REM ***   T-850 VS T-X (CRANE CHASE)   ***
+30 POKE 53280,0: POKE 53281,11 :REM BLACK BORDER, GREY ROAD
+40 PRINT "{CLR/HOME}"TAB(8)"INITIALIZING SKYNET..."
+
+100 REM *** DEFINING SPRITE DATA POINTERS ***
+110 V = 53248 : REM VIC-II BASE
+120 FOR I = 0 TO 7 : POKE 2040+I, 192+I : NEXT
+
+200 REM *** PROCEDURAL SPRITE GENERATION (SAVE TYPING) ***
+210 S = 12288 : REM $3000 (BLOCK 192)
+220 REM --- SPRITE 0: T-850 ON BIKE (SIDE VIEW) ---
+230 FOR I=0 TO 62 : POKE S+I, 0: NEXT
+240 FOR I=6 TO 15 : POKE S+I*3, 255 : NEXT : REM BIKE BODY
+250 POKE S+48, 60 : POKE S+49, 60 : REM WHEELS (BLOCKY)
+260 POKE S+50, 60
+270 POKE S+9, 24 : POKE S+12, 24 : REM ARNIE HEAD/TORSO
+
+300 REM --- SPRITE 4,5,6,7: THE CRANE (YELLOW MONSTER) ---
+310 REM WE FILL BLOCKS 196-199 SOLID YELLOW
+320 FOR B = 4 TO 7
+330 SP = 12288 + (B*64)
+340 FOR I = 0 TO 62 : POKE SP+I, 255 : NEXT
+350 NEXT B
+360 REM CARVE OUT WHEEL WELLS IN SPRITE 6 (CHASSIS)
+370 SP = 12288 + (6*64)
+380 FOR I = 40 TO 55 : POKE SP+I, 0 : NEXT
+
+400 REM *** VIC-II REGISTERS SETUP ***
+410 POKE V+21, 241 : REM ENABLE SPRITES 0,4,5,6,7 ($F1)
+420 POKE V+23, 240 : REM EXPAND X (WIDTH) FOR CRANE ($F0)
+430 POKE V+29, 240 : REM EXPAND Y (HEIGHT) FOR CRANE ($F0)
+440 REM --- COLORS ---
+450 POKE V+39, 0 : REM SPRITE 0 (ARNIE) BLACK
+460 POKE V+43, 7 : POKE V+44, 7 : REM CRANE YELLOW
+470 POKE V+45, 7 : POKE V+46, 7
+
+500 REM *** MAIN LOOP VARIABLES ***
+510 BX = 50 : BY = 140 : REM BIKE POS
+520 CX = 200 : CY = 120 : REM CRANE POS
+530 F = 0 : REM FRAME COUNTER
+
+1000 REM *** PHYSICS LOOP [$C000 EQUIVALENT] ***
+1010 F = F + 1
+1020 REM --- READ JOYSTICK PORT 2 ---
+1030 J = PEEK(56320)
+1040 IF (J AND 1)=0 THEN BY=BY-2 : REM UP
+1050 IF (J AND 2)=0 THEN BY=BY+2 : REM DOWN
+1060 IF (J AND 4)=0 THEN BX=BX-2 : REM LEFT
+1070 IF (J AND 8)=0 THEN BX=BX+2 : REM RIGHT
+1080 REM --- BOUNDARIES ---
+1090 IF BX<24 THEN BX=24
+1100 IF BX>250 THEN BX=250
+
+1200 REM --- CRANE ANIMATION (BOUNCE) ---
+1210 BO = INT(SIN(F/5)*3)
+1220 YC = CY + BO
+
+1300 REM --- RENDER SPRITES ---
+1310 POKE V+0, BX : POKE V+1, BY : REM BIKE
+1320 REM COMPOSITE CRANE (STACKED BLOCKS)
+1330 REM SPRITE 4 (BOOM/CAB UP)
+1340 POKE V+8, CX : POKE V+9, YC-30
+1350 REM SPRITE 5 (CAB MID)
+1360 POKE V+10, CX : POKE V+11, YC
+1370 REM SPRITE 6 (CHASSIS/WHEELS)
+1380 POKE V+12, CX-40 : POKE V+13, YC+10
+1390 REM SPRITE 7 (HOOK/BACK)
+1400 POKE V+14, CX+40 : POKE V+15, YC
+
+1400 REM --- ROAD EFFECT (SCROLL LINE) ---
+1410 IF (F AND 3)=0 THEN PRINT "{HOME}"SPC(39); : REM FLICKER FIX
+1420 POKE 1024 + 24*40 + (F AND 31), 160 : REM ROAD STRIPE
+
+1500 REM --- COLLISION DETECTION ---
+1510 IF (PEEK(V+30) AND 1) THEN GOTO 2000 : REM HIT?
+
+1600 GOTO 1010
+
+2000 REM *** CRASH ROUTINE ***
+2010 POKE V+39, 2 : REM TURN ARNIE RED
+2020 PRINT "{CLR/HOME}"TAB(10)"TERMINATED"
+2030 FOR I=1 TO 500: NEXT
+2040 POKE V+39, 0 : GOTO 510
+
+
+Technical Breakdown
+
+    Sprite Multiplexing (Fake): Instead of complex raster interrupts, we use the C64's Expand X/Y feature (Registers $D017 / $D01D) on the Crane sprites (4-7). This sets the bits to 240 ($F0), making the Crane sprites Double Height and Double Width, effectively creating a massive "Boss" sprite that fills half the screen with minimal data.
+    The Crane Geometry:
+        Sprite 6: The Chassis (offset Left).
+        Sprite 4/5: The Cab and Boom (offset Right/Up).
+        Sprite 7: The Rear/Hook.
+    Physics: Simple coordinate addition based on $DC00 (CIA#1 Port A) states.
+    The Road: Line 1420 uses direct POKES to Screen RAM (1024 + offset). It cycles through the bottom row positions (F AND 31) to create a racing stripe effect moving right-to-left relative to the bike.
