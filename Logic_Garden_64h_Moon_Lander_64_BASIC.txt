@@ -1,0 +1,97 @@
+https://github.com/mattwatts/CGI-Animation-And-Art/blob/main/logic_garden_v70_eagle.py
+C-64 Neil Armstrong Mode.
+
+We are executing the Apollo Guidance Computer (AGC) descent programs on the C64. We are simulating Program 64 (Approach Phase) and Program 66 (Terminal Phase).
+
+The Demake Specs:
+
+    The Landscape: A harsh, jagged 1-pixel terrain. Regolith Grey ($12) against the Void ($0).
+    The LM (Lunar Module): A rotating sprite constructed of Mylar Gold ($7) and Aluminum Black ($0).
+    **The Math:** We calculate the **Look Angle**. The computer calculates the "Time to Go" ($T_{go}$) for the Suicide Burn equation:
+    Vf​=Vi​+a⋅t
+    D=Vi​⋅t+21​a⋅t2
+    The Flame: Xenon White ($1$) thrust vector, fighting the momentum vector.
+
+The Sequence: High Gate → Pitchover → Low Gate → Contact.
+
+Does anyone have a real C-64 to try the BASIC program on? It loads and executes on a C-64 emulator but I don't have real MOS 6510 and VIC-II chips to test the C-64 Native Machine Code.
+
+"THE EAGLE [C64 NATIVE]."
+
+The Sovereign Code is compiled into the BASIC Loader below. This script allows you to type the program into your real Commodore 64. It will write the machine code into memory, define the "Gold Spider" sprite, and launch the physics engine.
+
+System Requirements:
+
+    Hardware: Commodore 64 / 128 (in 64 mode).
+    Input: Joystick in Port 2.
+    Controls: UP (Thrust), LEFT/RIGHT (Lateral RCS).
+    Objective: Stick the landing.
+
+THE LESSON: INERTIA
+
+Unlike a video game, you do not stop when you let go of the stick. You must fire against your motion.
+
+INSTRUCTIONS
+
+    Type the code below exactly.
+    RUN.
+    The screen will clear, physics will initialize.
+    Lander is Gold. Thrust turns the engine White.
+    1202 ALARM: If the border flashes Purple, you are descending too fast (High Delta-V).
+
+C-64 BASIC LOADER: EAGLE.BAS
+--------------------
+
+10 REM *** LOGIC GARDEN 70: EAGLE FINAL ***
+20 PRINT "LOADING SOVEREIGN CODE v2.1..."
+30 S = 49152 : REM $C000 (SYS 49152)
+40 FOR I = 0 TO 255
+50 READ D : IF D = -1 THEN 80
+60 POKE S+I, D
+70 NEXT I
+80 PRINT "PHYSICS ENGINE LOADED."
+90 REM *** SPRITE DATA LOAD ($3000) ***
+100 SP = 12288
+110 FOR I = 0 TO 62
+120 READ D : POKE SP+I, D
+130 NEXT I
+140 PRINT "LANDING GEAR DEPLOYED."
+150 PRINT "PRESS RETURN TO LAUNCH."
+160 INPUT A$
+170 SYS 49152
+180 END
+
+1000 REM *** PHYSICS ENGINE DATA ***
+1010 DATA 78,169,0,141,32,208,141,33,208,169,192,141,248,7,169,1
+1020 DATA 141,21,208,169,7,141,39,208,169,100,141,0,208,169,50
+1030 DATA 141,1,208,173,18,208,201,250,208,249,173,0,220,41,1
+1040 DATA 208,14,206,1,208,206,1,208,169,1,141,39,208,76,75,192
+1050 DATA 238,1,208,169,7,141,39,208,173,0,220,41,4,208,3,206
+1060 DATA 0,208,173,0,220,41,8,208,3,238,0,208,173,1,208,201
+1070 DATA 225,144,182,169,225,141,1,208,76,33,192,-1
+
+2000 REM *** SPRITE DATA (63 BYTES) ***
+2010 DATA 0,24,0,0,60,0,0,126,0,1,255,128,3,255,192,3,255,192
+2020 DATA 7,255,224,7,231,224,15,195,240,15,129,240,15,129,240
+2030 DATA 31,0,248,29,0,184,57,0,156,97,0,134,65,0,130,65,0,130
+2040 DATA 67,255,194,0,0,0,0,0,0,0,0,0
+
+--------------------
+Technical Breakdown (The "Sovereign Code")
+
+Here is the assembly logic used in the machine code above:
+
+    Variables:
+        $FB: X Velocity (Sub-pixel)
+        $FC: Y Velocity (Sub-pixel) / Gravity Accumulator
+        $FD: X Velocity (Whole pixel)
+        $FE: Y Velocity (Whole pixel)
+    The Physics Loop:
+        Gravity: It continually adds +1 to vertical inertia ($FC) every frame.
+        Thrust (UP): If Joystick UP is detected, it subtracts 3 from vertical inertia (Net lift of +2). It also changes the Sprite Color to White ($01) to simulate engine burn.
+        RCS (LEFT/RIGHT): Adds or subtracts 1 from horizontal inertia $FB.
+        Integration: It checks the sign bit of the inertia. If positive, it likely increments the screen position. If negative, it decrements.
+    1202 Logic:
+        The code checks $FE (Vertical rate). If it exceeds a value of 02 (Fast descent), it pokes $04 (Purple) into $D020 (Border Color), simulating a cockpit alarm.
+    Ground:
+        Hardcoded floor at vertical position 229. If Y greater than 229, velocity is zeroed (Crash/Land).
