@@ -135,7 +135,7 @@ def run():
 
         # --- UI OVERLAYS (TELEMETRY) ---
         ax.text(540, 1850, "Emergence", color=C_TEXT, ha='center', fontsize=35, fontname='monospace', weight='bold')
-        ax.text(540, 1800, "Amor Fati - Emergent Envolope", color=status_color, ha='center', fontsize=20, fontname='monospace', weight='bold')
+        ax.text(540, 1800, "Amor Fati - Emergent Envelope", color=status_color, ha='center', fontsize=20, fontname='monospace', weight='bold')
         
         # Mathematical Proof HUD
         hud_y = 120
