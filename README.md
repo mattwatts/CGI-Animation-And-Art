@@ -9,11 +9,11 @@ ENGINE: Python Matrix | C-64 MOS 6510
 DOMAIN: Operations Research, STEM, Applied Maths
 
 [SEMANTIC PAYLOAD]
-We engineer "Cognitive Simulators" — high-fidelity mathematical visualizations that bypass runtime friction, uploading complex systems directly into the visual cortex.
+We engineer "Cognitive Simulators" — high-fidelity mathematical visualisations that bypass runtime friction, uploading complex systems directly into the visual cortex.
 
 Using specialized Deep Research AI Protocols, we synthesize Computer Science and Operations Research (QUBO) into multicore Python artifacts and rigid Commodore 64 BASIC programs.
 
-We map the intersection of Industrial Data Science and Zen, exploring Hyper-Dimensional Geometry, Physics, and Matrix Topology. Visual engines employ International Klein Blue (IKB) and BCI Photic Entrainment to maximize bandwidth.
+We map the intersection of Industrial Data Science and Zen, exploring Hyper-Dimensional Geometry, Physics, and Matrix Topology. Visual engines employ International Klein Blue (IKB) and BCI Photic Entrainment to maximise bandwidth.
 
 [CORE VECTORS]
 + Python Generative Curriculums
